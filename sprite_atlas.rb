@@ -269,20 +269,20 @@ if __FILE__ == $0
 			data.replace!(imgdata,expand,expand)
 		end
 		$files[f]["data"] = data
-		$files[f]["w"] = data.width
-		$files[f]["h"] = data.height
-		$files[f]["s"] = data.height*data.width
+		$files[f][:w] = data.width
+		$files[f][:h] = data.height
+		$files[f][:size] = data.height*data.width
 	end
 
 	# A very simple optimization: sort the source file list so that largest images come first. This usually makes the atlas smaller.
 	src_files.sort! { |img_a,img_b|
-		size_a = $files[img_a]["s"]
-		size_b = $files[img_b]["s"]
+		size_a = $files[img_a][:size]
+		size_b = $files[img_b][:size]
 		size_b <=> size_a
 	}
 
 	src_files.each do |f|
-		add($root, f, $files[f]["w"],$files[f]["h"])
+		add($root, f, $files[f][:w],$files[f][:h])
 	end
 	create_png($root, png_out_file)
 
@@ -293,8 +293,8 @@ if __FILE__ == $0
 		json[n]["frame"] = {
 			"x" =>  $files[f]["out_x"] + expand,
 			"y" =>  $files[f]["out_y"] + expand,
-			"width" =>  $files[f]["w"] - 2*expand,
-			"height" =>  $files[f]["h"] - 2*expand
+			"width" =>  $files[f][:w] - 2*expand,
+			"height" =>  $files[f][:h] - 2*expand
 		}
 	end
 
