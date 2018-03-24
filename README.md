@@ -5,6 +5,12 @@ This is not trying to be the most powerful sprite atlas tool in the world. It's 
 
 Usage:
 
+First, please install a Ruby gem called chunky-png:
+
+> gem install chunky_png
+
+To create a sprite atlas:
+
 > ruby sprite_atlas.rb in_dir out_dir atlas_name
 
 in_dir is the directory which contains the PNG files you want to create the atlas from. out_dir refers to the output directory, which will contain two files: atlas_name.png which is the sprite atlas as png image, and atlas_name.json which contains the metadata you need to use the sprite atlas. All .png files inside in_dir will be included in the atlas. The directory in_dir may also contain an optional configuration file, named atlas.json, which is of following format:
