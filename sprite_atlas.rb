@@ -4,7 +4,6 @@ require 'chunky_png'
 require 'json'
 
 $files = {}
-$png_out_file = nil
 
 class Rect
 	attr_accessor :imageFileName
@@ -101,7 +100,6 @@ class Rect
 	end
 
 	def write_to_png(png)
-		g = Random.rand(255)
 		if imageFileName != nil then
 			puts "Writing " + @imageFileName
 			$files[@imageFileName]["out_x"] = @x
@@ -110,12 +108,6 @@ class Rect
 			if $files.has_key? @imageFileName then
 				data = $files[@imageFileName]["data"]
 				png.replace!(data,@x,@y)
-			else
-				@h.times do |y|
-					@w.times do |x|
-						png[@x + x, @y + y] = ChunkyPNG::Color.rgba(0, g, 0, 255)	
-					end
-				end
 			end
 		end
 		if @children != nil then
@@ -261,7 +253,7 @@ if __FILE__ == $0
 	end
 
 	json_out_file = out_dir + "/" + atlas_name + ".json"
-	$png_out_file = out_dir + "/" + atlas_name + ".png"
+	png_out_file = out_dir + "/" + atlas_name + ".png"
 
 	src_files = Dir[src_dir + "/*.png"]
 
@@ -292,7 +284,7 @@ if __FILE__ == $0
 	src_files.each do |f|
 		add($root, f, $files[f]["w"],$files[f]["h"])
 	end
-	create_png($root, $png_out_file)
+	create_png($root, png_out_file)
 
 	json = {}
 	src_files.each do |f|
