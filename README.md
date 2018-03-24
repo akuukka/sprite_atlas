@@ -1,7 +1,7 @@
 # sprite_atlas
 A simple Ruby script that creates sprite atlases. Supports PNG only.
 
-This is not trying to be the most powerful sprite atlas tool in the world. It's not really fast, nor is the packing algorithm highly optimized. But it's good enough for many purposes and it's free and can be easily integrated to your build processes.
+This is not trying to be the most powerful sprite atlas tool in the world. It's not really fast, nor is the packing algorithm highly optimized. But it's good enough for many purposes and it's free and can be easily integrated to your build process. This script succesfully handles several hundred sprites in the build process of the CRPG Helherron (see https://akuukka.github.io/helherron-web/).
 
 Usage:
 
