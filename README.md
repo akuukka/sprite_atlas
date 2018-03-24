@@ -11,17 +11,17 @@ First, please install a Ruby gem called chunky-png:
 
 To create a sprite atlas:
 
-> ruby sprite_atlas.rb in_dir out_dir atlas_name
+> ruby sprite_atlas.rb --in_dir source_directory --out_dir target_directory --atlas_name atlasname [--expand N]
 
-in_dir is the directory which contains the PNG files you want to create the atlas from. out_dir refers to the output directory, which will contain two files: atlas_name.png which is the sprite atlas as png image, and atlas_name.json which contains the metadata you need to use the sprite atlas. All .png files inside in_dir will be included in the atlas. The directory in_dir may also contain an optional configuration file, named atlas.json, which is of following format:
+Description of the parameters:
 
->{
->  "Expand": n
->}
+in_dir: Directory containing the png images that are put into the sprite atlas. All files .png files in the directory are automatically added.
 
-The supported configuration options are:
+out_dir: Where to put the output files (the actual sprite atlas .png file and JSON metadata file).
 
-Expand: how many empty pixels to put around each sprite in the atlas (to prevent artifacts from neighbouring sprites from appearing due to interpolation). The default value, which is used when no configuration file is present, is 0.
+atlas_name: Name for the output files. If your atlas_name is my_atlas, the output files are my_atlas.png and my_atlas.json.
+
+expand: (Optional) Number of empty pixels to put around each sprite in the atlas. If unspecified, the default value is 0.
 
 
 sprite_atlas is licensed under the MIT license.

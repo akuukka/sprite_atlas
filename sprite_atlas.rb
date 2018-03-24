@@ -150,68 +150,163 @@ def create_png(root, filename)
 	png.save(filename, :interlace => true)
 end
 
-src_dir = ARGV[0]
-out_dir = ARGV[1]
-atlas_name = ARGV[2]
+def parse_args()
+	args = {}
 
-if out_dir == nil or atlas_name == nil or src_dir == nil then
-	abort("Usage: ruby sprite_atlas.rb srcdir outdir atlasname")
-end
-
-json_out_file = out_dir + "/" + atlas_name + ".json"
-$png_out_file = out_dir + "/" + atlas_name + ".png"
-
-# Read config
-expand = 0
-json_file = src_dir + "/" + "atlas.json"
-if File.exists? json_file then
-	atlas_config = JSON.parse(File.read(json_file))
-	expand = atlas_config["Expand"].to_i
-end
-
-src_files = Dir[src_dir + "/*.png"]
-
-puts "Processing " + src_files.count().to_s + " images..."
-src_files.each do |f|
-	$files[f] = {}
-	data = nil
-	if expand == 0 then
-		data = ChunkyPNG::Image.from_file(f)
-	else
-		imgdata = ChunkyPNG::Image.from_file(f)
-		data = ChunkyPNG::Image.new(imgdata.width + 2*expand, imgdata.height + 2*expand, ChunkyPNG::Color::TRANSPARENT)
-		data.replace!(imgdata,expand,expand)
-	end
-	$files[f]["data"] = data
-	$files[f]["w"] = data.width
-	$files[f]["h"] = data.height
-	$files[f]["s"] = data.height*data.width
-end
-
-# A very simple optimization: sort the source file list so that largest images come first. This usually makes the atlas smaller.
-src_files.sort! { |img_a,img_b|
-	size_a = $files[img_a]["s"]
-	size_b = $files[img_b]["s"]
-	size_b <=> size_a
-}
-
-src_files.each do |f|
-	add($root, f, $files[f]["w"],$files[f]["h"])
-end
-create_png($root, $png_out_file)
-
-json = {}
-src_files.each do |f|
-	n = File.join(File.dirname(f), File.basename(f, '.*'))
-	json[n] = {}
-	json[n]["frame"] = {
-		"x" =>  $files[f]["out_x"] + expand,
-		"y" =>  $files[f]["out_y"] + expand,
-		"width" =>  $files[f]["w"] - 2*expand,
-		"height" =>  $files[f]["h"] - 2*expand
+	supported_args = {
+		"in_dir" => {
+			:params => 1,
+			:required => true
+		},
+		"out_dir" => {
+			:params => 1,
+			:required => true
+		},
+		"atlas_name" => {
+			:params => 1,
+			:required => true
+		},
+		"expand" => {
+			:params => 1,
+			:required => false
+		}
 	}
+
+	processed_indices = []
+
+	ARGV.each_with_index { |arg, index|
+		if processed_indices.include? index then
+			next
+		end
+
+		re = /--([a-z_]*$)/
+		m = arg.match(re)
+		if not m then
+			return nil
+		end
+
+		arg = m[1]
+		if not supported_args.has_key? arg then
+			return nil
+		end
+
+		expected_param_count = supported_args[arg][:params]
+
+		if ARGV.count <= index + expected_param_count then
+			return nil
+		end
+
+		processed_indices.push(index)
+		expected_param_count.times { |t|
+			processed_indices.push(index + 1 + t)
+		}
+
+		args[arg] = expected_param_count == 1 ? ARGV[index+1] : ARGV[(index+1)...(index+1+expected_param_count)]
+	}
+
+	supported_args.each { |argname, arg_params|
+		if not args.has_key? argname and arg_params[:required] then
+			puts "Required parameter " + argname + " is missing."
+			puts ""
+			return nil
+		end
+	}
+
+	return args
 end
 
-json_str = JSON.pretty_generate(json)
+def print_help()
+	help_str = <<-FOO
 
-File.open(json_out_file, 'w') { |file| file.write(json_str) }
+sprite_atlas.rb by Antti Kuukka
+
+A tool for creating sprite atlases from multiple png files.
+
+SYNOPSIS:
+    ruby sprite_atlas.rb --in_dir source_directory --out_dir target_directory --atlas_name atlasname [--expand N]
+
+DESCRIPTION:
+
+    The following options are available:
+
+    --in_dir       Directory containing the png images that are put into the sprite atlas. All files .png files
+                   in the directory are automatically added.
+
+    --out_dir      Where to put the output files (the actual sprite atlas .png file and JSON metadata file).
+
+    --atlas_name   Name for the output files. If your atlas_name is my_atlas, the output files are my_atlas.png
+                   and my_atlas.json.
+
+    --expand       Number of empty pixels to put around each sprite in the atlas. If unspecified, the default
+                   value is 0.
+
+FOO
+
+	puts(help_str)
+end
+
+if __FILE__ == $0
+	args = parse_args()
+	if args == nil then
+		print_help()
+		exit()
+	end
+
+	src_dir = args["in_dir"]
+	out_dir = args["out_dir"]
+	atlas_name = args["atlas_name"]
+	expand = 0
+	if args.has_key? "expand" then
+		expand = args["expand"].to_i
+	end
+
+	json_out_file = out_dir + "/" + atlas_name + ".json"
+	$png_out_file = out_dir + "/" + atlas_name + ".png"
+
+	src_files = Dir[src_dir + "/*.png"]
+
+	puts "Processing " + src_files.count().to_s + " images..."
+	src_files.each do |f|
+		$files[f] = {}
+		data = nil
+		if expand == 0 then
+			data = ChunkyPNG::Image.from_file(f)
+		else
+			imgdata = ChunkyPNG::Image.from_file(f)
+			data = ChunkyPNG::Image.new(imgdata.width + 2*expand, imgdata.height + 2*expand, ChunkyPNG::Color::TRANSPARENT)
+			data.replace!(imgdata,expand,expand)
+		end
+		$files[f]["data"] = data
+		$files[f]["w"] = data.width
+		$files[f]["h"] = data.height
+		$files[f]["s"] = data.height*data.width
+	end
+
+	# A very simple optimization: sort the source file list so that largest images come first. This usually makes the atlas smaller.
+	src_files.sort! { |img_a,img_b|
+		size_a = $files[img_a]["s"]
+		size_b = $files[img_b]["s"]
+		size_b <=> size_a
+	}
+
+	src_files.each do |f|
+		add($root, f, $files[f]["w"],$files[f]["h"])
+	end
+	create_png($root, $png_out_file)
+
+	json = {}
+	src_files.each do |f|
+		n = File.basename(f, '.*')
+		json[n] = {}
+		json[n]["frame"] = {
+			"x" =>  $files[f]["out_x"] + expand,
+			"y" =>  $files[f]["out_y"] + expand,
+			"width" =>  $files[f]["w"] - 2*expand,
+			"height" =>  $files[f]["h"] - 2*expand
+		}
+	end
+
+	json_str = JSON.pretty_generate(json)
+
+	File.open(json_out_file, 'w') { |file| file.write(json_str) }
+end
