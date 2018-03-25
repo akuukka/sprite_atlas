@@ -86,7 +86,7 @@ def max (a,b)
   a>b ? a : b
 end
 
-def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand)
+def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand, power_of_two)
 	# Insert largest images first, this usually makes the atlas smaller
 	insertion_order = sprite_list.keys
 	insertion_order.sort! { |img_a,img_b|
@@ -133,7 +133,6 @@ def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand)
 		insertion_position_candidates.delete(insert_to)
 		rect_to_sprite_mapping[new_rect] = filename
 
-		# Add new possible insertion positions
 		insertion_position_candidates.add(Vec2.new(new_rect.right,new_rect.top))
 		insertion_position_candidates.add(Vec2.new(new_rect.left,new_rect.bottom))
 		insertion_position_candidates.add(Vec2.new(new_rect.right,new_rect.bottom))
@@ -146,6 +145,15 @@ def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand)
 		atlas_width = max(atlas_width,r.right)
 		atlas_height = max(atlas_height,r.bottom)
 	}
+	if power_of_two then
+		m = max(atlas_width,atlas_height)
+		pot = 1
+		while m > pot do
+			pot = pot * 2
+		end
+		atlas_width = pot
+		atlas_height = pot
+	end
 
 	# And finally copy image data to their respective positions in the atlas and create metadata JSON
 	json = {}
@@ -189,6 +197,10 @@ def parse_args()
 		},
 		"expand" => {
 			:params => 1,
+			:required => false
+		},
+		"power_of_two" => {
+			:params => 0,
 			:required => false
 		}
 	}
@@ -244,22 +256,28 @@ sprite_atlas.rb by Antti Kuukka
 A tool for creating sprite atlases from multiple png files.
 
 SYNOPSIS:
-    ruby sprite_atlas.rb --in_dir source_directory --out_dir target_directory --atlas_name atlasname [--expand N]
+    ruby sprite_atlas.rb --in_dir source_directory --out_dir target_directory
+       --atlas_name atlasname [--expand N] [--power_of_two]
 
 DESCRIPTION:
 
     The following options are available:
 
-    --in_dir       Directory containing the png images that are put into the sprite atlas. All files .png files
-                   in the directory are automatically added.
+    --in_dir       Directory containing the png images that are put into the
+                   sprite atlas. All files .png files in the directory are
+                   automatically added.
 
-    --out_dir      Where to put the output files (the actual sprite atlas .png file and JSON metadata file).
+    --out_dir      Where to put the output files (the actual sprite atlas .png
+                   file and JSON metadata file).
 
-    --atlas_name   Name for the output files. If your atlas_name is my_atlas, the output files are my_atlas.png
-                   and my_atlas.json.
+    --atlas_name   Name for the output files. If your atlas_name is my_atlas,
+                   the output files are my_atlas.png and my_atlas.json.
 
-    --expand       Number of empty pixels to put around each sprite in the atlas. If unspecified, the default
-                   value is 0.
+    --expand       (Optional) Number of empty pixels to put around each sprite
+                   in the atlas. If unspecified, the default value is 0.
+
+    --power_of_two (Optional) Forces the resulting sprite atlas to be
+                   rectangular and width/height to be power of two.
 
 FOO
 
@@ -304,5 +322,7 @@ if __FILE__ == $0
 		sprite_list[f][:size] = data.height*data.width
 	end
 
-	generate_atlas(sprite_list, png_out_file, json_out_file, expand)
+	power_of_two = args.has_key? "power_of_two"
+
+	generate_atlas(sprite_list, png_out_file, json_out_file, expand, power_of_two)
 end
