@@ -4,6 +4,12 @@ require 'chunky_png'
 require 'json'
 require 'set'
 
+module OperationMode
+  Default = 1
+  Verbose = 2
+  Silent = 4
+end
+
 class Vec2
 	attr_accessor :x
 	attr_accessor :y
@@ -86,10 +92,9 @@ def max (a,b)
   a>b ? a : b
 end
 
-def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand, power_of_two)
+def generate_atlas(operation_mode, sprite_list, out_png_filename, out_json_filename, expand, power_of_two)
 	# Insert largest images first, this usually makes the atlas smaller
-	insertion_order = sprite_list.keys
-	insertion_order.sort! { |img_a,img_b|
+	insertion_order = sprite_list.keys.sort { |img_a,img_b|
 		size_a = sprite_list[img_a][:size]
 		size_b = sprite_list[img_b][:size]
 		size_b <=> size_a
@@ -99,7 +104,10 @@ def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand, pow
 	rectangles = []
 	rect_to_sprite_mapping = {}
 
-	puts "Finding position for each sprite..."
+	if operation_mode == OperationMode::Verbose then
+		puts "Finding position for each sprite..."
+	end
+
 	counter = 0
 	insertion_order.each { |filename|
 		w = sprite_list[filename][:w]
@@ -160,7 +168,9 @@ def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand, pow
 	png = ChunkyPNG::Image.new(atlas_width, atlas_height, ChunkyPNG::Color::TRANSPARENT)
 	rectangles.each { |r|
 		fn = rect_to_sprite_mapping[r]
-		puts "Adding " + fn
+		if operation_mode == OperationMode::Verbose then
+			puts "Adding " + fn
+		end
 		png_data = sprite_list[fn][:data]
 		png.replace!(png_data,r.x,r.y)
 
@@ -200,6 +210,14 @@ def parse_args()
 			:required => false
 		},
 		"power_of_two" => {
+			:params => 0,
+			:required => false
+		},
+		"verbose" => {
+			:params => 0,
+			:required => false
+		},
+		"silent" => {
 			:params => 0,
 			:required => false
 		}
@@ -257,7 +275,8 @@ A tool for creating sprite atlases from multiple png files.
 
 SYNOPSIS:
     ruby sprite_atlas.rb --in_dir source_directory --out_dir target_directory
-       --atlas_name atlasname [--expand N] [--power_of_two]
+       --atlas_name atlasname [--expand N] [--power_of_two] [--verbose]
+       [--silent]
 
 DESCRIPTION:
 
@@ -279,6 +298,11 @@ DESCRIPTION:
     --power_of_two (Optional) Forces the resulting sprite atlas to be
                    rectangular and width/height to be power of two.
 
+    --verbose      (Optional) Print more information about progress while
+                   building the sprite atlas.
+
+    --silent       (Optional) Print nothing while building the atlas.
+
 FOO
 
 	puts(help_str)
@@ -289,6 +313,13 @@ if __FILE__ == $0
 	if args == nil then
 		print_help()
 		exit()
+	end
+
+	operation_mode = OperationMode::Default
+	if args.has_key? "verbose" then
+		operation_mode = OperationMode::Verbose
+	elsif args.has_key? "silent" then
+		operation_mode = OperationMode::Silent
 	end
 
 	src_dir = args["in_dir"]
@@ -305,7 +336,9 @@ if __FILE__ == $0
 	src_files = Dir[src_dir + "/*.png"]
 
 	sprite_list = {}
-	puts "Processing " + src_files.count().to_s + " images..."
+	if operation_mode != OperationMode::Silent then
+		puts "Generating sprite atlas '#{atlas_name}' with #{src_files.count.to_s} sprites."
+	end
 	src_files.each do |f|
 		sprite_list[f] = {}
 		data = nil
@@ -323,6 +356,5 @@ if __FILE__ == $0
 	end
 
 	power_of_two = args.has_key? "power_of_two"
-
-	generate_atlas(sprite_list, png_out_file, json_out_file, expand, power_of_two)
+	generate_atlas(operation_mode, sprite_list, png_out_file, json_out_file, expand, power_of_two)
 end
