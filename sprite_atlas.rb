@@ -2,144 +2,173 @@
 
 require 'chunky_png'
 require 'json'
+require 'set'
 
-$files = {}
+class Vec2
+	attr_accessor :x
+	attr_accessor :y
+
+	def initialize(x,y)
+		@x=x
+		@y=y
+	end
+
+	def to_s
+		return "(#{x},#{y})"
+	end
+
+	def ==(o)
+		return (o.class == Vec2 and o.x == @x and o.y == @y)
+	end
+
+	def eql?(o)
+		return o == self
+	end
+
+	def hash()
+		return (@x << 16) + @y
+	end
+end
 
 class Rect
-	attr_accessor :imageFileName
+	attr_accessor :x
+	attr_accessor :y
 	attr_accessor :w
 	attr_accessor :h
-	attr_accessor :children
 
 	def initialize(x, y, w, h)
 		@x = x
 		@y = y
 		@w = w
 		@h = h
-		@children = nil
-		@imageFileName = nil
 	end
 
-	def to_s
-		s = "R: (#{@x}x#{@y} , #{@w}x#{@h}) img: #{@imageFileName}\n"
-		return s
+	def left()
+		return @x
 	end
 
-	def add(imageFileName, w, h)
-		if @imageFileName != nil then
-			return false
-		end
+	def right()
+		return @x + @w
+	end
 
-		# Maybe some of the children can accommodate this?
-		if @children != nil then
-			@children.each do |child|
-				success = child.add(imageFileName,w,h)
-				if success then
-					return true
+	def top()
+		return @y
+	end
+
+	def bottom()
+		return @y + @h
+	end
+
+	def intersects(o)
+		a = self
+		b = o
+		a1 = (a.left < b.right)
+		a2 = a.right > b.left
+		a3 = a.top < b.bottom
+		a4 = a.bottom > b.top
+		return (a1 && a2 && a3 && a4) 
+	end
+
+	def ==(o)
+		return (o.x == @x and o.y == @y and o.w == @w and o.h == @h)
+	end
+
+	def eql?(o)
+		return o == self
+	end
+
+	def hash()
+		return ((@x & 0xff) << 24) + ((@y & 0xff) << 16) + ((@w & 0xff) << 8) + (@h & 0xff)
+	end
+end
+
+def max (a,b)
+  a>b ? a : b
+end
+
+def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand)
+	# Insert largest images first, this usually makes the atlas smaller
+	insertion_order = sprite_list.keys
+	insertion_order.sort! { |img_a,img_b|
+		size_a = sprite_list[img_a][:size]
+		size_b = sprite_list[img_b][:size]
+		size_b <=> size_a
+	}
+
+	insertion_position_candidates = [Vec2.new(0,0)].to_set
+	rectangles = []
+	rect_to_sprite_mapping = {}
+
+	puts "Finding position for each sprite..."
+	counter = 0
+	insertion_order.each { |filename|
+		w = sprite_list[filename][:w]
+		h = sprite_list[filename][:h]
+
+		insert_to = nil
+		best_metric = -1
+		insertion_position_candidates.each { |pos_cand|
+			rect_cand = Rect.new(pos_cand.x,pos_cand.y,w,h)
+
+			failed = false
+			rectangles.each { |r|
+				if r.intersects(rect_cand) then
+					failed = true
+					break
 				end
-			end
-		else
-			if w > @w or h > @h then
-				return false
-			end
-			if w == @w and h == @h then
-				@imageFileName = imageFileName
-				return true
+			}
+			if failed then
+				next
 			end
 
-			if w < @w and h == @h then
-				r0 = Rect.new(@x,@y,w,h)
-				r0.imageFileName = imageFileName
-				r1 = Rect.new(@x + w,@y,@w-w,h)
-				@children = [r0,r1]
-				return true
+			metric = max(pos_cand.x,pos_cand.y)
+			if metric < best_metric or best_metric < 0 then
+				best_metric = metric
+				insert_to = pos_cand
 			end
+		}
 
-			if w == @w and h < @h then
-				r0 = Rect.new(@x,@y,w,h)
-				r0.imageFileName = imageFileName
-				r1 = Rect.new(@x,@y+h,@w,@h-h)
-				@children = [r0,r1]
-				return true
-			end
+		new_rect = Rect.new(insert_to.x,insert_to.y,w,h)
+		rectangles.push(new_rect)
+		insertion_position_candidates.delete(insert_to)
+		rect_to_sprite_mapping[new_rect] = filename
 
-			if w < @w and h < @h then
-				r0 = Rect.new(@x,@y,w,h)
-				r0.imageFileName = imageFileName
-				r1 = Rect.new(@x,@y+h,w,@h-h)
-				r2 = Rect.new(@x+w,@y,@w-w,h)
-				r3 = Rect.new(@x + w,@y + h,@w-w,@h-h)
-				@children = [r0,r1,r2,r3]
-				return true
-			end
+		# Add new possible insertion positions
+		insertion_position_candidates.add(Vec2.new(new_rect.right,new_rect.top))
+		insertion_position_candidates.add(Vec2.new(new_rect.left,new_rect.bottom))
+		insertion_position_candidates.add(Vec2.new(new_rect.right,new_rect.bottom))
+	}
 
-		end
+	# Get size for the final atlas
+	atlas_width = 0
+	atlas_height = 0
+	rectangles.each { |r|
+		atlas_width = max(atlas_width,r.right)
+		atlas_height = max(atlas_height,r.bottom)
+	}
 
-		return false
-	end
+	# And finally copy image data to their respective positions in the atlas and create metadata JSON
+	json = {}
+	png = ChunkyPNG::Image.new(atlas_width, atlas_height, ChunkyPNG::Color::TRANSPARENT)
+	rectangles.each { |r|
+		fn = rect_to_sprite_mapping[r]
+		puts "Adding " + fn
+		png_data = sprite_list[fn][:data]
+		png.replace!(png_data,r.x,r.y)
 
-	def increase_size(n)
-		nw = @w + n
-		nh = @h + n
+		n = File.basename(fn, '.*')
+		json[n] = {}
+		json[n]["frame"] = {
+			"x" =>  r.x + expand,
+			"y" =>  r.y + expand,
+			"width" =>  r.w - 2*expand,
+			"height" =>  r.h - 2*expand
+		}
+	}
+	png.save(out_png_filename, :interlace => true)
 
-		r0 = Rect.new(@x,@y,@w,@h)
-		if @imageFileName != nil then
-			r0.imageFileName = @imageFileName
-			@imageFileName = nil
-		else
-			r0.children = @children
-		end
-
-		r1 = Rect.new(@x,@y + @h,@w,n)
-		r2 = Rect.new(@x + @w,@y,n,@h)
-		r3 = Rect.new(@x + @w,@y + @h,n,n)
-		@children = [r0,r1,r2,r3]
-
-		@w = nw
-		@h = nh
-	end
-
-	def write_to_png(png)
-		if imageFileName != nil then
-			puts "Writing " + @imageFileName
-			$files[@imageFileName]["out_x"] = @x
-			$files[@imageFileName]["out_y"] = @y
-
-			if $files.has_key? @imageFileName then
-				data = $files[@imageFileName]["data"]
-				png.replace!(data,@x,@y)
-			end
-		end
-		if @children != nil then
-			@children.each do |child|
-				child.write_to_png(png)
-			end
-		end
-	end
-
-end
-
-$root = nil
-
-def add(root, imageFileName, w, h, allowResize = true)
-	if $root == nil then
-		$root = Rect.new(0,0,w,h)
-	end
-
-	success = $root.add(imageFileName,w,h)
-	if not success then
-		if not allowResize then
-			return
-		end
-		$root.increase_size(w > h ? w : h)
-		success = $root.add(imageFileName,w,h)
-	end
-end
-
-def create_png(root, filename)
-	png = ChunkyPNG::Image.new(root.w, root.h, ChunkyPNG::Color::TRANSPARENT)
-	root.write_to_png(png)
-	png.save(filename, :interlace => true)
+	json_str = JSON.pretty_generate(json)
+	File.open(out_json_filename, 'w') { |file| file.write(json_str) }
 end
 
 def parse_args()
@@ -257,9 +286,10 @@ if __FILE__ == $0
 
 	src_files = Dir[src_dir + "/*.png"]
 
+	sprite_list = {}
 	puts "Processing " + src_files.count().to_s + " images..."
 	src_files.each do |f|
-		$files[f] = {}
+		sprite_list[f] = {}
 		data = nil
 		if expand == 0 then
 			data = ChunkyPNG::Image.from_file(f)
@@ -268,37 +298,11 @@ if __FILE__ == $0
 			data = ChunkyPNG::Image.new(imgdata.width + 2*expand, imgdata.height + 2*expand, ChunkyPNG::Color::TRANSPARENT)
 			data.replace!(imgdata,expand,expand)
 		end
-		$files[f]["data"] = data
-		$files[f][:w] = data.width
-		$files[f][:h] = data.height
-		$files[f][:size] = data.height*data.width
+		sprite_list[f][:data] = data
+		sprite_list[f][:w] = data.width
+		sprite_list[f][:h] = data.height
+		sprite_list[f][:size] = data.height*data.width
 	end
 
-	# A very simple optimization: sort the source file list so that largest images come first. This usually makes the atlas smaller.
-	src_files.sort! { |img_a,img_b|
-		size_a = $files[img_a][:size]
-		size_b = $files[img_b][:size]
-		size_b <=> size_a
-	}
-
-	src_files.each do |f|
-		add($root, f, $files[f][:w],$files[f][:h])
-	end
-	create_png($root, png_out_file)
-
-	json = {}
-	src_files.each do |f|
-		n = File.basename(f, '.*')
-		json[n] = {}
-		json[n]["frame"] = {
-			"x" =>  $files[f]["out_x"] + expand,
-			"y" =>  $files[f]["out_y"] + expand,
-			"width" =>  $files[f][:w] - 2*expand,
-			"height" =>  $files[f][:h] - 2*expand
-		}
-	end
-
-	json_str = JSON.pretty_generate(json)
-
-	File.open(json_out_file, 'w') { |file| file.write(json_str) }
+	generate_atlas(sprite_list, png_out_file, json_out_file, expand)
 end
