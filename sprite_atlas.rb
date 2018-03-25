@@ -165,7 +165,7 @@ def generate_atlas(sprite_list, out_png_filename, out_json_filename, expand)
 			"height" =>  r.h - 2*expand
 		}
 	}
-	png.save(out_png_filename, :interlace => true)
+	png.save(out_png_filename, :interlace => false)
 
 	json_str = JSON.pretty_generate(json)
 	File.open(out_json_filename, 'w') { |file| file.write(json_str) }
