@@ -110,8 +110,8 @@ def generate_atlas(operation_mode, sprite_list, out_png_filename, out_json_filen
 
 	counter = 0
 	insertion_order.each { |filename|
-		w = sprite_list[filename][:w]
-		h = sprite_list[filename][:h]
+		w = sprite_list[filename][:w] + 2*expand
+		h = sprite_list[filename][:h] + 2*expand
 
 		insert_to = nil
 		best_metric = -1
@@ -172,15 +172,15 @@ def generate_atlas(operation_mode, sprite_list, out_png_filename, out_json_filen
 			puts "Adding " + fn
 		end
 		png_data = sprite_list[fn][:data]
-		png.replace!(png_data,r.x,r.y)
+		png.replace!(png_data,r.x + expand,r.y + expand)
 
 		n = File.basename(fn, '.*')
 		json[n] = {}
 		json[n]["frame"] = {
 			"x" =>  r.x + expand,
 			"y" =>  r.y + expand,
-			"width" =>  r.w - 2*expand,
-			"height" =>  r.h - 2*expand
+			"width" =>  sprite_list[fn][:w],
+			"height" =>  sprite_list[fn][:h]
 		}
 	}
 	png.save(out_png_filename, :interlace => false)
@@ -341,14 +341,7 @@ if __FILE__ == $0
 	end
 	src_files.each do |f|
 		sprite_list[f] = {}
-		data = nil
-		if expand == 0 then
-			data = ChunkyPNG::Image.from_file(f)
-		else
-			imgdata = ChunkyPNG::Image.from_file(f)
-			data = ChunkyPNG::Image.new(imgdata.width + 2*expand, imgdata.height + 2*expand, ChunkyPNG::Color::TRANSPARENT)
-			data.replace!(imgdata,expand,expand)
-		end
+		data = ChunkyPNG::Image.from_file(f)
 		sprite_list[f][:data] = data
 		sprite_list[f][:w] = data.width
 		sprite_list[f][:h] = data.height
