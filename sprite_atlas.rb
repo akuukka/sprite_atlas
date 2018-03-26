@@ -336,16 +336,25 @@ if __FILE__ == $0
 	src_files = Dir[src_dir + "/*.png"]
 
 	sprite_list = {}
-	if operation_mode != OperationMode::Silent then
-		puts "Generating sprite atlas '#{atlas_name}' with #{src_files.count.to_s} sprites."
-	end
 	src_files.each do |f|
+		data = nil
+		begin
+			data = ChunkyPNG::Image.from_file(f)
+		rescue
+			if operation_mode != OperationMode::Silent then 
+				STDERR.puts "Skipping #{f}: not a proper png image."
+			end
+			next
+		end
 		sprite_list[f] = {}
-		data = ChunkyPNG::Image.from_file(f)
 		sprite_list[f][:data] = data
 		sprite_list[f][:w] = data.width
 		sprite_list[f][:h] = data.height
 		sprite_list[f][:size] = data.height*data.width
+	end
+
+	if operation_mode != OperationMode::Silent then
+		puts "Generating sprite atlas '#{atlas_name}' with #{sprite_list.count.to_s} sprites."
 	end
 
 	power_of_two = args.has_key? "power_of_two"
